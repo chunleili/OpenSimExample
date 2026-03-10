@@ -1,0 +1,52 @@
+name: opensim
+channels:
+  - conda-forge
+  - opensim-org
+  - defaults
+dependencies:
+  - bzip2=1.0.8=h0ad9c76_9
+  - ca-certificates=2026.2.25=h4c7d964_0
+  - freeglut=3.2.2=he0c23c2_3
+  - libblas=3.11.0=5_hf2e6a31_mkl
+  - libcblas=3.11.0=5_h2a3cdd5_mkl
+  - libexpat=2.7.4=hac47afa_0
+  - libffi=3.5.2=h3d046cb_0
+  - libhwloc=2.12.2=default_h4379cf1_1000
+  - libiconv=1.18=hc1393d2_2
+  - liblapack=3.11.0=5_hf9ab0e9_mkl
+  - liblzma=5.8.2=hfd05255_0
+  - libsqlite=3.52.0=hf5d6505_0
+  - libwinpthread=12.0.0.r4.gg4f2fc60ca=h57928b3_10
+  - libxml2=2.15.2=h5d26750_0
+  - libxml2-16=2.15.2=h692994f_0
+  - libzlib=1.3.1=h2466b09_2
+  - llvm-openmp=22.1.0=h4fa8253_0
+  - mkl=2025.3.0=hac47afa_455
+  - opensim=4.5.2=py311np125
+  - openssl=3.6.1=hf411b9b_1
+  - packaging=26.0=pyhcf101f3_0
+  - pip=26.0.1=pyh8b19718_0
+  - python=3.11.15=h0159041_0_cpython
+  - python_abi=3.11=8_cp311
+  - setuptools=82.0.1=pyh332efcf_0
+  - tbb=2022.3.0=h3155e25_2
+  - tk=8.6.13=h6ed50ae_3
+  - tzdata=2025c=hc9c84f9_1
+  - ucrt=10.0.26100.0=h57928b3_0
+  - vc=14.3=h41ae7f8_34
+  - vc14_runtime=14.44.35208=h818238b_34
+  - vcomp14=14.44.35208=h818238b_34
+  - vs2015_runtime=14.44.35208=h38c0c73_34
+  - wheel=0.46.3=pyhd8ed1ab_0
+  - pip:
+      - contourpy==1.3.3
+      - cycler==0.12.1
+      - fonttools==4.62.0
+      - kiwisolver==1.5.0
+      - matplotlib==3.10.8
+      - numpy==2.0.2
+      - pillow==12.1.1
+      - pyparsing==3.3.2
+      - python-dateutil==2.9.0.post0
+      - six==1.17.0
+prefix: D:\App\Miniconda\envs\opensim
