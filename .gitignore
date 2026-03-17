@@ -1,1 +1,9 @@
 __pycache__
+output*
+*.log
+.vscode/
+SlidingMass.osim
+sliding_mass.omoco
+sliding_mass_solution.sto
+sliding_mass_result.png
+Copy_of_Tutorial_7_*.ipynb
