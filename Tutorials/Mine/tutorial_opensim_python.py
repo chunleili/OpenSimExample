@@ -162,12 +162,12 @@ def chapter2_build_arm_model():
     # --- 2.11 保存运动数据 ---
     states_table = manager.getStatesTable()
     sto_adapter = osim.STOFileAdapter()
-    sto_adapter.write(states_table, "output_SimpleArm_states.sto")
-    print("运动数据已保存到 output_SimpleArm_states.sto")
+    sto_adapter.write(states_table, "output/output_SimpleArm_states.sto")
+    print("运动数据已保存到 output/output_SimpleArm_states.sto")
 
     # --- 2.12 保存模型文件 ---
-    arm.printToXML("output_SimpleArm.osim")
-    print("模型已保存到 output_SimpleArm.osim")
+    arm.printToXML("output/output_SimpleArm.osim")
+    print("模型已保存到 output/output_SimpleArm.osim")
 
     return arm
 
@@ -290,11 +290,11 @@ def chapter5_data_io():
         )
         table.appendRow(t, row)
 
-    osim.STOFileAdapter.write(table, "output_example_data.sto")
-    print("已写入 output_example_data.sto")
+    osim.STOFileAdapter.write(table, "output/output_example_data.sto")
+    print("已写入 output/output_example_data.sto")
 
     # --- 5.2 读取 STO 文件 ---
-    loaded = osim.TimeSeriesTable("output_example_data.sto")
+    loaded = osim.TimeSeriesTable("output/output_example_data.sto")
     print(f"读取到 {loaded.getNumRows()} 行, {loaded.getNumColumns()} 列")
     print(f"列名: {loaded.getColumnLabels()}")
     print(f"时间范围: {loaded.getIndependentColumn()[0]:.3f} ~ "
@@ -322,8 +322,8 @@ def chapter5_data_io():
         ])
         table_vec3.appendRow(t, row)
 
-    osim.STOFileAdapterVec3.write(table_vec3, "output_markers.sto")
-    print("已写入 output_markers.sto (Vec3 格式)")
+    osim.STOFileAdapterVec3.write(table_vec3, "output/output_markers.sto")
+    print("已写入 output/output_markers.sto (Vec3 格式)")
 
 
 # ============================================================================
@@ -436,12 +436,12 @@ def chapter7_wiring_and_reporter():
     print(f"Reporter 记录了 {table.getNumRows()} 行数据")
     print(f"列名: {table.getColumnLabels()}")
 
-    osim.STOFileAdapterVec3.write(table, "output_reporter_demo.sto")
-    print("结果已保存到 output_reporter_demo.sto")
+    osim.STOFileAdapterVec3.write(table, "output/output_reporter_demo.sto")
+    print("结果已保存到 output/output_reporter_demo.sto")
 
     # --- 7.4 保存模型（连接信息会序列化到 XML 中） ---
-    model.printToXML("output_reporter_demo.osim")
-    print("模型已保存到 output_reporter_demo.osim")
+    model.printToXML("output/output_reporter_demo.osim")
+    print("模型已保存到 output/output_reporter_demo.osim")
 
 
 # ============================================================================
@@ -526,8 +526,8 @@ def chapter8_moco_basics():
 
     # --- 8.6 查看结果 ---
     print(f"求解状态: {solution.getStatus()}")
-    solution.write("output_sliding_mass_solution.sto")
-    print("解已保存到 output_sliding_mass_solution.sto")
+    solution.write("output/output_sliding_mass_solution.sto")
+    print("解已保存到 output/output_sliding_mass_solution.sto")
 
     # 提取状态数据
     states_table = solution.exportToStatesTable()
@@ -539,7 +539,7 @@ def chapter8_moco_basics():
     print(f"终止速度: {speed[-1]:.6f}")
 
     # 保存问题配置文件（可复现）
-    study.printToXML("output_sliding_mass.omoco")
+    study.printToXML("output/output_sliding_mass.omoco")
 
     return solution
 
@@ -597,7 +597,7 @@ def chapter9_moco_with_muscle():
 
     body.attachGeometry(osim.Sphere(0.05))
     model.finalizeConnections()
-    model.printToXML("output_hanging_muscle.osim")
+    model.printToXML("output/output_hanging_muscle.osim")
 
     # --- 9.2 设置 Moco 问题 ---
     study = osim.MocoStudy()
@@ -641,10 +641,10 @@ def chapter9_moco_with_muscle():
 
     # --- 9.5 导出结果 ---
     osim.STOFileAdapter.write(
-        solution.exportToStatesTable(), "output_hanging_muscle_states.sto"
+        solution.exportToStatesTable(), "output/output_hanging_muscle_states.sto"
     )
     osim.STOFileAdapter.write(
-        solution.exportToControlsTable(), "output_hanging_muscle_controls.sto"
+        solution.exportToControlsTable(), "output/output_hanging_muscle_controls.sto"
     )
     print("状态和控制信号已保存。")
 
@@ -692,6 +692,8 @@ if __name__ == "__main__":
     osim.ModelVisualizer.addDirToGeometrySearchPaths(
         os.path.join(os.getcwd(), "Geometry")
     )
+
+    os.makedirs("output", exist_ok=True)
 
     print("=" * 60)
     print("  OpenSim Python API 教程")

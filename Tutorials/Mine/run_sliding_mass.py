@@ -3,6 +3,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+
+os.makedirs("output", exist_ok=True)
 
 print('=== Creating sliding mass model ===')
 model = osim.Model()
@@ -24,8 +27,8 @@ model.addComponent(actu)
 
 body.attachGeometry(osim.Sphere(0.05))
 model.finalizeConnections()
-model.printToXML('SlidingMass.osim')
-print('Model saved to SlidingMass.osim')
+model.printToXML('output/output_SlidingMass.osim')
+print('Model saved to output/output_SlidingMass.osim')
 
 print('=== Setting up MocoStudy ===')
 study = osim.MocoStudy()
@@ -42,13 +45,13 @@ problem.addGoal(osim.MocoFinalTimeGoal())
 
 solver = study.initCasADiSolver()
 solver.set_num_mesh_intervals(100)
-study.printToXML('sliding_mass.omoco')
-print('Study saved to sliding_mass.omoco')
+study.printToXML('output/output_sliding_mass.omoco')
+print('Study saved to output/output_sliding_mass.omoco')
 
 print('=== Solving... ===')
 solution = study.solve()
-solution.write('sliding_mass_solution.sto')
-print('Solution saved to sliding_mass_solution.sto')
+solution.write('output/output_sliding_mass_solution.sto')
+print('Solution saved to output/output_sliding_mass_solution.sto')
 
 solutionAsTable = solution.exportToStatesTable()
 times = solutionAsTable.getIndependentColumn()
@@ -62,6 +65,6 @@ plt.plot(times, speeds.to_numpy(), label='Speed')
 plt.legend(loc='best')
 plt.xlabel('Time')
 plt.ylabel('Value')
-plt.savefig('sliding_mass_result.png', dpi=150)
-print('Plot saved to sliding_mass_result.png')
+plt.savefig('output/output_sliding_mass_result.png', dpi=150)
+print('Plot saved to output/output_sliding_mass_result.png')
 print('=== Done! ===')

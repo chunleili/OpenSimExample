@@ -11,8 +11,8 @@
     2. python validation_level1_joint_torques.py
 
 输出：
-    output_level1_fem_coordinates.sto  —— FEM 关节角度（OpenSim 格式）
-    output_level1_id_results/          —— InverseDynamics 输出（关节力矩）
+    output/output_level1_fem_coordinates.sto  —— FEM 关节角度（OpenSim 格式）
+    output/output_level1_id_results/          —— InverseDynamics 输出（关节力矩）
 ================================================================================
 """
 
@@ -30,11 +30,11 @@ import os
 MODEL_PATH = os.path.join("Models", "Gait10dof18musc", "gait10dof18musc.osim")
 
 # FEM 数据文件路径（如果已有，设为你的文件路径；否则用 demo 生成）
-FEM_COORDINATES_FILE = "output_level1_fem_coordinates.sto"
-FEM_TORQUES_FILE = "output_level1_fem_torques.sto"  # 你的 FEM 力矩数据
+FEM_COORDINATES_FILE = "output/output_level1_fem_coordinates.sto"
+FEM_TORQUES_FILE = "output/output_level1_fem_torques.sto"  # 你的 FEM 力矩数据
 
 # InverseDynamics 结果目录
-ID_RESULTS_DIR = "output_level1_id_results"
+ID_RESULTS_DIR = "output/output_level1_id_results"
 
 
 # ============================================================================
@@ -282,6 +282,8 @@ if __name__ == "__main__":
     osim.ModelVisualizer.addDirToGeometrySearchPaths(
         os.path.join(os.getcwd(), "Geometry")
     )
+
+    os.makedirs("output", exist_ok=True)
 
     print("=" * 60)
     print("  Level 1: 关节力矩对比 (InverseDynamics)")

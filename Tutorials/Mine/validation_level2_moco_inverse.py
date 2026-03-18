@@ -10,8 +10,8 @@
     python validation_level2_moco_inverse.py
 
 输出：
-    output_level2_inverse_solution.sto —— MocoInverse 解（激活值 + 状态）
-    output_level2_comparison.sto       —— 对比结果
+    output/output_level2_inverse_solution.sto —— MocoInverse 解（激活值 + 状态）
+    output/output_level2_comparison.sto       —— 对比结果
 ================================================================================
 """
 
@@ -32,10 +32,10 @@ MODEL_PATH = os.path.join("Models", "Gait10dof18musc", "gait10dof18musc.osim")
 # MODEL_PATH = os.path.join("Models", "Rajagopal", "Rajagopal2016.osim")
 
 # FEM 输入数据
-FEM_COORDINATES_FILE = "output_level1_fem_coordinates.sto"
+FEM_COORDINATES_FILE = "output/output_level1_fem_coordinates.sto"
 
 # RL 策略输出的激活值（你需要准备这个文件）
-RL_ACTIVATIONS_FILE = "output_level2_rl_activations.sto"
+RL_ACTIVATIONS_FILE = "output/output_level2_rl_activations.sto"
 
 # MocoInverse 配置
 MESH_INTERVAL = 0.02       # 网格间隔 (秒)
@@ -124,7 +124,7 @@ def run_moco_inverse(coordinates_file, t0=None, tf=None):
     print(f"  求解状态: {status}")
 
     # 保存
-    output_path = "output_level2_inverse_solution.sto"
+    output_path = "output/output_level2_inverse_solution.sto"
     moco_solution.write(output_path)
     print(f"  解已保存到 {output_path}")
 
@@ -301,8 +301,8 @@ def compare_activations(moco_solution):
 
         plt.suptitle('Muscle Activation Comparison: OpenSim vs RL', fontsize=14)
         plt.tight_layout()
-        plt.savefig('output_level2_comparison.png', dpi=150)
-        print(f"\n  对比图已保存到 output_level2_comparison.png")
+        plt.savefig('output/output_level2_comparison.png', dpi=150)
+        print(f"\n  对比图已保存到 output/output_level2_comparison.png")
     except ImportError:
         print("\n  matplotlib 未安装，跳过绘图。")
 
@@ -341,8 +341,8 @@ def run_sensitivity_analysis(coordinates_file, t0, tf):
         try:
             sol = run_moco_inverse(coordinates_file, t0, tf)
             if sol is not None:
-                sol.write(f"output_level2_sensitivity_{name}.sto")
-                print(f"  → 已保存 output_level2_sensitivity_{name}.sto")
+                sol.write(f"output/output_level2_sensitivity_{name}.sto")
+                print(f"  → 已保存 output/output_level2_sensitivity_{name}.sto")
         except Exception as e:
             print(f"  → 配置 {name} 失败: {e}")
 
@@ -355,6 +355,8 @@ if __name__ == "__main__":
     osim.ModelVisualizer.addDirToGeometrySearchPaths(
         os.path.join(os.getcwd(), "Geometry")
     )
+
+    os.makedirs("output", exist_ok=True)
 
     print("=" * 60)
     print("  Level 2: MocoInverse 肌肉激活值对比")
