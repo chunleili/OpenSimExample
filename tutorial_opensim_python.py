@@ -560,12 +560,19 @@ def chapter9_moco_with_muscle():
     # --- 9.1 创建肌肉悬挂模型 ---
     model = osim.Model()
     model.setName("hanging_muscle")
-    model.set_gravity(osim.Vec3(9.81, 0, 0))  # +x 方向为重力方向
+    model.set_gravity(osim.Vec3(0, -9.81, 0))  # 重力沿 -y，抬升方向为 +y
 
     body = osim.Body("body", 0.5, osim.Vec3(0), osim.Inertia(1))
     model.addComponent(body)
 
-    joint = osim.SliderJoint("joint", model.getGround(), body)
+    # SliderJoint 总是沿其局部 x 轴平移；将关节框架绕 z 轴旋转 +90 度后，
+    # 坐标正方向就对应世界坐标的 +y（向上）。
+    joint_axis_up = osim.Vec3(0, 0, np.pi / 2)
+    joint = osim.SliderJoint(
+        "joint",
+        model.getGround(), osim.Vec3(0), joint_axis_up,
+        body, osim.Vec3(0), joint_axis_up,
+    )
     coord = joint.updCoordinate()
     coord.setName("height")
     model.addComponent(joint)
@@ -583,7 +590,8 @@ def chapter9_moco_with_muscle():
     muscle.set_tendon_compliance_dynamics_mode("implicit")
     muscle.set_max_contraction_velocity(10)
     muscle.set_pennation_angle_at_optimal(0.10)
-    muscle.addNewPathPoint("origin", model.updGround(), osim.Vec3(0))
+    # 将肌肉固定点放在小球上方，使肌肉拉力沿 +y，和重力相反。
+    muscle.addNewPathPoint("origin", model.updGround(), osim.Vec3(0, 0.30, 0))
     muscle.addNewPathPoint("insertion", body, osim.Vec3(0))
     model.addForce(muscle)
 
@@ -597,10 +605,10 @@ def chapter9_moco_with_muscle():
     problem.setModelAsCopy(model)
 
     # 时间边界
-    problem.setTimeBounds(0, [0.05, 1.0])
+    problem.setTimeBounds(0, [0.05, 2.0])
 
-    # 位置：从 0.15m 抬到 0.14m（下降 1cm 即抬起负重）
-    problem.setStateInfo("/joint/height/value", [0.14, 0.16], 0.15, 0.14)
+    # 位置：y 方向向上，从 0.10 m 抬升到 0.15 m。
+    problem.setStateInfo("/joint/height/value", [0.05, 0.2], 0.10, 0.15)
     problem.setStateInfo("/joint/height/speed", [-1, 1], 0, 0)
     problem.setControlInfo("/forceset/muscle", [0.01, 1])
 
@@ -693,20 +701,16 @@ if __name__ == "__main__":
     # 可以注释掉不需要的章节
     # 第 2 章需要可视化器，在无 GUI 环境下设 USE_VISUALIZER = False
     # 第 8、9 章需要 CasADi 求解器，首次运行可能较慢
-    chapter2_build_arm_model()     # 构建手臂模型
+    chapter2_build_arm_model()     # 构建手臂模型并仿真 10 秒
     chapter3_load_and_inspect()      # 加载和检查模型
 
     chapter4_numpy_conversions()     # NumPy 互转（最快，无需仿真）
     chapter5_data_io()               # 数据文件读写
-    chapter10_joint_types()          # 关节类型速查
-    chapter3_load_and_inspect()      # 加载和检查模型
     chapter6_posthoc_analysis()      # 仿真后分析
     chapter7_wiring_and_reporter()   # Input/Output 和 Reporter
-
-    # 以下章节涉及仿真和优化，运行时间较长：
-    # chapter2_build_arm_model()     # 构建手臂并仿真 10 秒（需要可视化器或设 USE_VISUALIZER=False）
-    # chapter8_moco_basics()         # Moco 滑块优化
-    # chapter9_moco_with_muscle()    # Moco 肌肉优化
+    chapter8_moco_basics()         # Moco 滑块优化
+    chapter9_moco_with_muscle()    # Moco 肌肉优化
+    chapter10_joint_types()          # 关节类型速查
 
     print("\n" + "=" * 60)
     print("教程运行完毕！")
