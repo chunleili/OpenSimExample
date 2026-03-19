@@ -9,6 +9,9 @@ import os
 import time
 
 
+
+
+
 class ParticleFlags:
     """Flags for particle properties."""
     ACTIVE = 1 << 0
@@ -1069,8 +1072,8 @@ class ModelBuilder:
         # --- adjacency (vertex → tet) ---
         m.particle_adjacency = self._build_adjacency(n, device)
 
-        # --- graph coloring for parallel VBD ---
-        m.particle_color_groups = self._build_graph_coloring(n, device)
+        # graph coloring deferred to caller (e.g. Example.__init__)
+        m.particle_color_groups = []
 
         # --- gravity ---
         if self.world_gravity:
@@ -1123,33 +1126,6 @@ class ModelBuilder:
         adj.v_adj_springs_offsets = wp.clone(empty_offsets)
 
         return adj
-
-    def _build_graph_coloring(self, n: int, device: str) -> list:
-        """Greedy graph coloring: vertices sharing a tet get different colors."""
-        neighbors = [set() for _ in range(n)]
-        for i, j, k, l in self.tet_indices:
-            verts = [i, j, k, l]
-            for a in range(4):
-                for b in range(a + 1, 4):
-                    neighbors[verts[a]].add(verts[b])
-                    neighbors[verts[b]].add(verts[a])
-
-        colors = [-1] * n
-        for v in range(n):
-            used = {colors[nb] for nb in neighbors[v] if colors[nb] >= 0}
-            c = 0
-            while c in used:
-                c += 1
-            colors[v] = c
-
-        num_colors = (max(colors) + 1) if n > 0 else 0
-        groups = [[] for _ in range(num_colors)]
-        for v, c in enumerate(colors):
-            groups[c].append(v)
-
-        print(f"Graph coloring: {n} vertices -> {num_colors} colors")
-        return [wp.array(g, dtype=wp.int32, device=device) for g in groups]
-
 
     @property
     def particle_count(self):
@@ -1397,6 +1373,12 @@ def extract_surface_triangles(tet_indices_np: np.ndarray) -> list[tuple[int, int
 
 def save_ply(filename: str, positions: np.ndarray, surface_faces: list[tuple[int, int, int]]):
     """Save mesh surface to PLY file."""
+    try:
+        import meshio
+        meshio.Mesh(points=positions, cells=[("triangle", surface_faces)]).write(filename)
+        return
+    except ImportError:
+        pass
     with open(filename, "w") as fp:
         fp.write("ply\n")
         fp.write("format ascii 1.0\n")
@@ -1411,6 +1393,50 @@ def save_ply(filename: str, positions: np.ndarray, surface_faces: list[tuple[int
             fp.write(f"{p[0]:.6f} {p[1]:.6f} {p[2]:.6f}\n")
         for f in surface_faces:
             fp.write(f"3 {f[0]} {f[1]} {f[2]}\n")
+
+
+class UsdTetExporter:
+    def __init__(self, tet_indices, usd_path="output/anim.usda", prim_path="tet", fps=24, start_frame=0):
+        from pxr import Usd, UsdGeom, Gf, Vt
+        self.usd_path = usd_path
+        self.prim_path = prim_path
+        self.fps = fps
+
+        self.stage = Usd.Stage.CreateNew(usd_path)
+        self.stage.SetStartTimeCode(start_frame)
+        self.stage.SetEndTimeCode(start_frame)
+        self.stage.SetTimeCodesPerSecond(fps)
+
+        self.tet = UsdGeom.TetMesh.Define(self.stage, prim_path)
+        self.tet.CreateOrientationAttr().Set(UsdGeom.Tokens.rightHanded)
+
+        tet_vec4 = Vt.Vec4iArray([Gf.Vec4i(int(t[0]), int(t[1]), int(t[2]), int(t[3])) for t in tet_indices])
+        self.tet.GetTetVertexIndicesAttr().Set(tet_vec4)
+
+        surface_faces = UsdGeom.TetMesh.ComputeSurfaceFaces(self.tet)
+        self.tet.CreateSurfaceFaceVertexIndicesAttr().Set(surface_faces)
+        self.points_attr = self.tet.GetPointsAttr()
+
+    def save_frame(self, positions, frame):
+        from pxr import Usd, UsdGeom, Gf, Vt
+        assert positions.shape[1] == 3, "Positions must be Nx3 array"
+        pts = Vt.Vec3fArray.FromNumpy(positions)
+        self.points_attr.Set(pts, Usd.TimeCode(frame))
+        self.stage.SetEndTimeCode(frame)
+
+    def finalize(self):
+        self.stage.GetRootLayer().Save()
+
+
+def build_particle_coloring(model: Model, tet_indices: list, tet_active_mask=None):
+    """Build MCS graph coloring from tet connectivity and assign to model."""
+    from .graph_coloring import construct_tetmesh_graph_edges, color_graph, ColoringAlgorithm
+    tet_indices_np = np.array(tet_indices, dtype=np.int32)
+    edges_np = construct_tetmesh_graph_edges(tet_indices_np, tet_active_mask=tet_active_mask)
+    edges_wp = wp.array(edges_np, dtype=int, device="cpu")
+    color_groups_np = color_graph(model.particle_count, edges_wp, algorithm=ColoringAlgorithm.MCS)
+    model.particle_color_groups = [wp.array(g, dtype=wp.int32, device=model.device) for g in color_groups_np]
+    print(f"Graph coloring (MCS): {model.particle_count} vertices -> {len(color_groups_np)} colors")
 
 
 # ---------------------------------------------------------------------------- #
@@ -1443,6 +1469,8 @@ class Example:
         )
         self.model = builder.finalize(device=device)
 
+        build_particle_coloring(self.model, builder.tet_indices)
+
         self.solver = SolverVBDMuscle(self.model)
         self.state_in = self.model.state()
         self.state_out = self.model.state()
@@ -1453,9 +1481,14 @@ class Example:
         tet_indices_np = np.array(builder.tet_indices, dtype=np.int32)
         self.surface_faces = extract_surface_triangles(tet_indices_np)
 
-        # Output directory
+        # exporter
         self.output_dir = "output/ply"
         os.makedirs(self.output_dir, exist_ok=True)
+        try: 
+            self.usd_exporter=UsdTetExporter(builder.tet_indices, usd_path="output/anim.usda", prim_path="/tet", fps=24, start_frame=0)
+        except Exception as e:
+            print(f"USD export unavailable, falling back to PLY output: {e}")
+            self.usd_exporter = None
 
     def step(self, dt):
         for _ in range(self.nsubsteps):
@@ -1463,10 +1496,14 @@ class Example:
             self.state_in, self.state_out = self.state_out, self.state_in
 
     def save_frame(self, frame: int):
-        """Save current particle positions to PLY."""
+        """Save current particle positions."""
         positions = self.state_in.particle_q.numpy()
-        filename = os.path.join(self.output_dir, f"frame_{frame:04d}.ply")
-        save_ply(filename, positions, self.surface_faces)
+        try:
+            self.usd_exporter.save_frame(positions, frame)
+            print(f"Saved frame {frame} to {self.usd_exporter.usd_path}")
+        except Exception as e:
+            filename = os.path.join(self.output_dir, f"frame_{frame:04d}.ply")
+            save_ply(filename, positions, self.surface_faces)
 
     def run(self):
         num_steps = 300
@@ -1498,6 +1535,8 @@ class Example:
                 )
 
         self.save_frame(num_steps)
+        if self.usd_exporter:
+            self.usd_exporter.finalize()
         print(f"\nDone. Frames saved to {self.output_dir}/")
 
 
