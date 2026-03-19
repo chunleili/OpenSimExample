@@ -26,12 +26,16 @@ import os
 # 配置区
 # ============================================================================
 
+# 脚本目录和项目根目录
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+
 # 使用的 OpenSim 模型（可改为 Rajagopal 等）
-MODEL_PATH = os.path.join("Models", "Gait10dof18musc", "gait10dof18musc.osim")
+MODEL_PATH = os.path.join(PROJECT_ROOT, "Models", "Gait10dof18musc", "gait10dof18musc.osim")
 
 # FEM 数据文件路径（如果已有，设为你的文件路径；否则用 demo 生成）
 FEM_COORDINATES_FILE = "output/output_level1_fem_coordinates.sto"
-FEM_TORQUES_FILE = "output/output_level1_fem_torques.sto"  # 你的 FEM 力矩数据
+FEM_TORQUES_FILE = "output/output_level1_fem_torques.sto"
 
 # InverseDynamics 结果目录
 ID_RESULTS_DIR = "output/output_level1_id_results"
@@ -76,6 +80,7 @@ def convert_fem_to_sto(fem_times, fem_angles, coord_names, output_path,
 def demo_generate_fem_data():
     """
     生成模拟的 FEM 数据作为示例。
+    用 InverseDynamics 计算物理一致的力矩，再加小噪声模拟 FEM 偏差。
     实际使用时替换为你的 FEM 仿真输出。
     """
     print("=" * 60)
@@ -115,15 +120,51 @@ def demo_generate_fem_data():
     # 保存关节角度
     convert_fem_to_sto(times, angles, coord_names, FEM_COORDINATES_FILE)
 
-    # 生成模拟的 FEM 力矩（实际应从 FEM 仿真导出）
-    torques = np.zeros((n_frames, n_dof))
-    for j in range(min(3, n_dof)):
-        torques[:, j] = 10.0 * np.cos(2 * math.pi * 0.5 * times)
+    # 用 InverseDynamics 计算物理一致的力矩作为基准
+    print("  运行 InverseDynamics 生成物理一致的基准力矩...")
+    temp_id_dir = os.path.join("output", "_temp_demo_id")
+    os.makedirs(temp_id_dir, exist_ok=True)
 
-    convert_fem_to_sto(times, torques, coord_names, FEM_TORQUES_FILE)
+    id_tool = osim.InverseDynamicsTool()
+    id_tool.setModelFileName(MODEL_PATH)
+    id_tool.setCoordinatesFileName(FEM_COORDINATES_FILE)
+    id_tool.setLowpassCutoffFrequency(6.0)
+    id_tool.setStartTime(float(times[0]))
+    id_tool.setEndTime(float(times[-1]))
+    id_tool.setResultsDir(temp_id_dir)
+    id_tool.setOutputGenForceFileName("temp_id.sto")
+    id_tool.run()
+
+    # 读取 ID 力矩，映射回坐标名
+    id_output_path = os.path.join(temp_id_dir, "temp_id.sto")
+    id_table = osim.TimeSeriesTable(id_output_path)
+    id_times = np.array(id_table.getIndependentColumn())
+    id_labels = list(id_table.getColumnLabels())
+
+    n_id = len(id_times)
+    torques = np.zeros((n_id, n_dof))
+    for j, coord_name in enumerate(coord_names):
+        for suffix in ["_moment", "_force", ""]:
+            id_col = coord_name + suffix
+            if id_col in id_labels:
+                torques[:, j] = id_table.getDependentColumn(id_col).to_numpy()
+                break
+
+    # 加 5% 高斯噪声模拟 FEM 与 OpenSim 的差异
+    np.random.seed(42)
+    for j in range(n_dof):
+        scale = max(np.std(torques[:, j]), 1e-6)
+        torques[:, j] += 0.05 * scale * np.random.randn(n_id)
+
+    convert_fem_to_sto(id_times, torques, coord_names, FEM_TORQUES_FILE)
     print(f"  FEM 力矩已保存到 {FEM_TORQUES_FILE}")
+    print(f"  （基于 ID 基准 + 5% 噪声）")
 
-    return times, angles, coord_names
+    # 清理临时文件
+    import shutil
+    shutil.rmtree(temp_id_dir, ignore_errors=True)
+
+    return id_times, torques, coord_names
 
 
 # ============================================================================
@@ -280,7 +321,7 @@ def compare_joint_torques(id_output_path):
 
 if __name__ == "__main__":
     osim.ModelVisualizer.addDirToGeometrySearchPaths(
-        os.path.join(os.getcwd(), "Geometry")
+        os.path.join(PROJECT_ROOT, "Geometry")
     )
 
     os.makedirs("output", exist_ok=True)
@@ -289,6 +330,10 @@ if __name__ == "__main__":
     print("  Level 1: 关节力矩对比 (InverseDynamics)")
     print("=" * 60)
     print(f"  OpenSim 版本: {osim.GetVersion()}")
+
+    # copy model to ouput dir
+    import shutil
+    shutil.copy(MODEL_PATH, os.path.join("output", os.path.basename(MODEL_PATH)))
 
     # STEP 1: 生成/导入 FEM 数据
     # 实际使用时：替换 demo_generate_fem_data() 为你的 FEM 数据加载代码

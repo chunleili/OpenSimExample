@@ -2,6 +2,15 @@
 
 OpenSim 生物力学示例集合 + 基于 Vertex Block Descent (VBD) 的体积肌肉仿真原型。
 
+
+## vbd muscle
+- 基于 [Vertex Block Descent (Chen et al., SIGGRAPH 2024)](https://graphics.cs.utah.edu/research/projects/vbd/) 的体积肌肉仿真 Python脚本。
+
+示例脚本:vbd_muscle/example_vbd.py
+单个脚本的VBD仿真示例。参考NVIDIA [Newton](https://github.com/newton-physics/newton) VDB实现。
+该脚本不依赖任何其他文件，直接运行即可。
+
+
 ## Tutorials/Mine 示例脚本
 
 以下脚本位于 `Tutorials/Mine/`，所有输出保存在 `output/` 文件夹下（`output_` 前缀）。
