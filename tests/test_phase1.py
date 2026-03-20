@@ -422,6 +422,83 @@ def test_fiber_pk1_stress():
     return ok
 
 
+# --------------------------------------------------------------------------
+# 10. Reaction force under fully-constrained uniform deformation
+# --------------------------------------------------------------------------
+
+def test_reaction_force_uniform():
+    """Verify reaction forces under fully-prescribed uniform deformation.
+
+    All vertices are directly placed at x_i = F * X_i (no solver run).
+    The sum of elastic gradients at z=0 face vertices should equal
+    the PK1 traction on the reference z=0 face: F_z = -P_zz * A_ref.
+    (Negative because the outward normal of z=0 face is [0,0,-1].)
+    """
+    print("\n=== Reaction force (fully constrained uniform deformation) ===")
+    ok = True
+
+    from vbd_muscle.solver import VBDSolver
+    from vbd_muscle.mesh import assign_fiber_directions
+
+    l_opt = 0.10
+    sigma0 = 300000.0
+    mu = 5000.0
+    kappa = 100 * mu
+    F0 = 1000.0
+    PCSA = F0 / sigma0
+    side = np.sqrt(PCSA)
+
+    nodes, tets = generate_box_mesh(side, side, l_opt, 3, 3, 6)
+    fiber_dirs = assign_fiber_directions(nodes, tets)
+    A_ref = side ** 2  # reference cross-section area
+
+    lam_values = [0.9, 0.95, 1.0, 1.05, 1.1, 1.2]
+
+    for lam in lam_values:
+        solver = VBDSolver(
+            nodes, tets, fiber_dirs,
+            mu=mu, kappa=kappa, sigma0=sigma0,
+            density=1060.0, damping=0.01, dt=0.001,
+            n_iterations=1,
+            gravity=np.array([0.0, 0.0, 0.0]),
+        )
+
+        # Directly set ALL vertex positions to uniform deformation
+        # (set_prescribed_positions does NOT update solver.x)
+        lat = 1.0 / np.sqrt(max(lam, 0.01))
+        center_x, center_y = side / 2.0, side / 2.0
+        for vi in range(len(nodes)):
+            solver.x[vi] = np.array([
+                center_x + (nodes[vi, 0] - center_x) * lat,
+                center_y + (nodes[vi, 1] - center_y) * lat,
+                nodes[vi, 2] * lam,
+            ])
+
+        # Compute reaction forces at z=0 face
+        z_min_verts = np.where(np.abs(nodes[:, 2]) < 1e-10)[0]
+        rf = solver.compute_reaction_forces(z_min_verts, activation=1.0)
+        total_Fz = sum(f[2] for f in rf.values())
+
+        # Analytical: PK1 stress for this uniform F
+        F_mat = np.diag([lat, lat, lam])
+        d0 = np.array([0.0, 0.0, 1.0])
+        P = total_pk1(F_mat, d0, mu, kappa, sigma0, 1.0)
+
+        # Expected z-force on z=0 face:
+        # By FEM divergence, sum of elastic gradients at z=0 face =
+        # integral of P @ N dA over the reference z=0 face, where N=[0,0,-1].
+        # So F_z_expected = P_zz * (-1) * A_ref = -P_zz * A_ref
+        F_expected = -P[2, 2] * A_ref
+
+        rel_err = abs(total_Fz - F_expected) / (abs(F_expected) + 1.0)
+        ok &= report(
+            f"reaction force lam={lam:.2f}",
+            rel_err < 1e-6,
+            f"Fz={total_Fz:.2f} N, expected={F_expected:.2f} N, rel_err={rel_err:.2e}")
+
+    return ok
+
+
 # ==========================================================================
 
 def main():
