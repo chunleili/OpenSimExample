@@ -374,6 +374,54 @@ def test_vbd_basic():
     return ok
 
 
+# --------------------------------------------------------------------------
+# 9. Fiber PK1 stress vs DGF analytical
+# --------------------------------------------------------------------------
+
+def test_fiber_pk1_stress():
+    """Verify fiber_pk1 Cauchy stress matches DGF analytical curves.
+
+    For uniaxial incompressible deformation F = diag(1/sqrt(lam), 1/sqrt(lam), lam)
+    with d0 = [0,0,1], the Cauchy stress zz component should equal:
+        sigma_zz = sigma0 * (activation * f_L(lam) + f_PE(lam)) * lam
+    The extra lam factor comes from the PK1 -> Cauchy conversion (P @ F^T).
+    """
+    print("\n=== Fiber PK1 stress vs DGF analytical ===")
+    ok = True
+
+    d0 = np.array([0.0, 0.0, 1.0])
+    sigma0 = 300000.0
+
+    lam_values = [0.5, 0.7, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3, 1.5]
+    activations = [0.0, 0.5, 1.0]
+
+    for act in activations:
+        for lam in lam_values:
+            # Incompressible uniaxial deformation
+            lat = 1.0 / np.sqrt(lam)
+            F = np.diag([lat, lat, lam])
+            J = np.linalg.det(F)  # should be ~1.0
+
+            P_fiber = fiber_pk1(F, d0, sigma0, act)
+
+            # Cauchy stress: sigma = (1/J) * P @ F^T
+            cauchy = (1.0 / J) * P_fiber @ F.T
+            sigma_zz = cauchy[2, 2]
+
+            # DGF analytical (extra lam from PK1->Cauchy conversion)
+            fL = active_force_length(lam)
+            fPE = passive_force_length(lam)
+            sigma_expected = sigma0 * (act * fL + fPE) * lam
+
+            err = abs(sigma_zz - sigma_expected) / (abs(sigma_expected) + 1.0)
+            ok &= report(
+                f"fiber stress a={act:.1f} lam={lam:.2f}",
+                err < 1e-10,
+                f"got={sigma_zz:.2f}, expected={sigma_expected:.2f}, rel_err={err:.2e}")
+
+    return ok
+
+
 # ==========================================================================
 
 def main():
