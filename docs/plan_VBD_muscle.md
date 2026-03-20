@@ -156,7 +156,7 @@ a^{t+1} = a^t + h · f(e^{t+1}, a^{t+1})
 - [x] Dirichlet BC + 逐自由度约束 (`vbd_muscle/solver.py: set_fixed_dof`)
 - [x] 准静态求解 + 步长限制 (`vbd_muscle/solver.py: solve_static`)
 - [x] 激活动力学 (`vbd_muscle/activation.py`)
-- [ ] GPU 移植（Taichi / CUDA）
+- [ ] GPU 移植（Warp）
 - [ ] 解析 Hessian（目前用 FD，GPU 版需解析）
 
 ---
@@ -292,16 +292,16 @@ Phase 4.3 (RL 集成)               ─── 4 周 (待做)
 | 复杂肌肉路径的网格生成困难 | 从简单圆柱开始；绕包肌肉用碰撞几何处理 |
 | Hessian 投影丢失负曲率信息 | 使用 VBD 论文推荐的"翻转最小特征值"策略 |
 | 全身 GPU 性能不达实时 | RL 训练用粗网格；降采样；现代 GPU (A100/H100) |
-| 纯 Python VBD 性能差 | 用 Numba JIT 加速内循环；或直接 Taichi 重写 |
+| 纯 Python VBD 性能差 | 用  Warp 重写 |
 
 ## 推荐技术栈
 
 - **网格生成**: gmsh (Python API) / TetGen
 - **CPU 原型**: Python + NumPy（已实现）→ Numba 加速
-- **GPU 实现**: Taichi（快速原型）→ CUDA（生产级）
+- **GPU 实现**: Warp
 - **RL 框架**: Isaac Lab / stable-baselines3
 - **OpenSim 配准**: 已有脚本（`validation_level0/1/2_*.py`）
-- **可视化**: Polyscope / Open3D
+- **可视化**: OpenUSD/ ply 文件输出 or warp 的内置可视化 or viser(https://viser.studio/main/)
 
 ## 关键文件
 
