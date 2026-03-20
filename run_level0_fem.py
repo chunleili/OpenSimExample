@@ -15,8 +15,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from vbd_muscle.dgf_curves import active_force_length, passive_force_length
-from vbd_muscle.mesh import generate_box_mesh, assign_fiber_directions
-from vbd_muscle.solver import VBDSolver
 from vbd_muscle.activation import activation_dynamics
 
 # -----------------------------------------------------------------------
@@ -86,129 +84,6 @@ def plot_analytical_curves():
 
 
 # =======================================================================
-# Part 3: VBD quasi-static F-L validation
-# =======================================================================
-
-def vbd_force_length(lam_values, activation=1.0, nx=2, ny=2, nz=8,
-                     n_iterations=100):
-    """Run VBD quasi-static simulations at different fiber stretches.
-
-    Uses incremental loading: stretches are applied in sorted order,
-    reusing the previous converged state as initial guess.
-
-    Args:
-        lam_values: Array of target stretch ratios.
-        activation: Muscle activation level.
-        nx, ny, nz: Mesh resolution.
-        n_iterations: VBD static solve iterations per stretch.
-    Returns:
-        forces: Axial reaction force at each stretch, shape (len(lam_values),).
-    """
-    nodes, tets = generate_box_mesh(side, side, l_opt, nx, ny, nz)
-    fiber_dirs = assign_fiber_directions(nodes, tets)
-
-    # Identify boundary vertices
-    z_coords = nodes[:, 2]
-    z_min_verts = np.where(np.abs(z_coords - 0.0) < 1e-10)[0]
-    z_max_verts = np.where(np.abs(z_coords - l_opt) < 1e-10)[0]
-
-    # Create a single solver instance and reuse across stretches
-    solver = VBDSolver(
-        nodes, tets, fiber_dirs,
-        mu=mu, kappa=kappa, sigma0=sigma0,
-        density=1060.0, damping=0.01, dt=0.001,
-        n_iterations=20,
-        gravity=np.array([0.0, 0.0, 0.0]),
-    )
-
-    forces = np.zeros(len(lam_values))
-
-    for i, lam in enumerate(lam_values):
-        # Create fresh solver for each stretch to avoid state leaking
-        solver = VBDSolver(
-            nodes, tets, fiber_dirs,
-            mu=mu, kappa=kappa, sigma0=sigma0,
-            density=1060.0, damping=0.01, dt=0.001,
-            n_iterations=20,
-            gravity=np.array([0.0, 0.0, 0.0]),
-        )
-
-        # Set initial guess: uniform axial stretch, incompressible lateral
-        lat = 1.0 / np.sqrt(max(lam, 0.1))  # lateral scale
-        center_x = side / 2.0
-        center_y = side / 2.0
-        for vi in range(len(nodes)):
-            solver.x[vi, 2] = nodes[vi, 2] * lam
-            solver.x[vi, 0] = center_x + (nodes[vi, 0] - center_x) * lat
-            solver.x[vi, 1] = center_y + (nodes[vi, 1] - center_y) * lat
-
-        # Fix only z-coordinate at both end faces (x,y free for Poisson)
-        # z=0 face: fix z=0
-        z_min_prescribed = np.zeros((len(z_min_verts), 1))
-        solver.set_fixed_dof(z_min_verts, [2], z_min_prescribed)
-
-        # z=L face: fix z = lam * l_opt
-        z_max_prescribed = np.full((len(z_max_verts), 1), lam * l_opt)
-        solver.set_fixed_dof(z_max_verts, [2], z_max_prescribed)
-
-        # Fix one corner vertex fully to prevent rigid body translation
-        solver.set_fixed_vertices([z_min_verts[0]])
-
-        # Quasi-static solve
-        converged, n_iters = solver.solve_static(
-            activation=activation,
-            n_iterations=n_iterations,
-            tol=1e-8,
-        )
-
-        # Measure reaction force at z=0
-        rf = solver.compute_reaction_forces(z_min_verts, activation=activation)
-        total_force_z = sum(f[2] for f in rf.values())
-        forces[i] = total_force_z
-
-        status = "converged" if converged else f"not converged ({n_iters} iters)"
-        print(f"  lambda={lam:.2f}: F_z={total_force_z:.2f} N [{status}]")
-
-    return forces
-
-
-def run_vbd_fl_validation():
-    """Run VBD F-L validation and compare with DGF."""
-    print("\n--- VBD Force-Length Validation ---")
-    print(f"  Mesh: side={side*100:.2f} cm, length={l_opt*100:.1f} cm")
-    print(f"  PCSA={PCSA*1e4:.2f} cm^2, F0={F0:.0f} N, sigma0={sigma0/1e3:.0f} kPa")
-
-    lam_values = np.array([0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3])
-    forces = vbd_force_length(lam_values, activation=1.0, nx=2, ny=2, nz=5,
-                              n_iterations=200)
-
-    # DGF reference
-    fL = active_force_length(lam_values)
-    fPE = passive_force_length(lam_values)
-    dgf_forces = F0 * (fL + fPE)
-
-    # Plot
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(lam_values, forces / F0, 'bo-', label='VBD (quasi-static)', linewidth=2)
-    ax.plot(lam_values, dgf_forces / F0, 'r--', label='DGF reference', linewidth=2)
-    ax.set_xlabel(r'Normalized fiber length $\lambda$')
-    ax.set_ylabel(r'Normalized force ($F / F_0$)')
-    ax.set_title('VBD vs DGF Force-Length Curve')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig('output/output_level0_vbd_fl.png', dpi=150)
-    print("Saved output/output_level0_vbd_fl.png")
-
-    # RMSE
-    rmse = np.sqrt(np.mean((forces / F0 - dgf_forces / F0) ** 2))
-    print(f"\n  RMSE (normalized): {rmse:.4f}")
-    print(f"  Target: < 0.05")
-
-    return fig
-
-
-# =======================================================================
 # Part 4: Activation dynamics validation
 # =======================================================================
 
@@ -274,20 +149,7 @@ def main():
     print("\n--- Part 1: Analytical DGF Curves ---")
     plot_analytical_curves()
 
-    # Part 2: VBD quasi-static (slow in pure Python, optional)
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--skip-vbd', action='store_true',
-                        help='Skip VBD quasi-static validation (slow)')
-    args, _ = parser.parse_known_args()
-
-    if not args.skip_vbd:
-        print("\n--- Part 2: VBD Quasi-Static F-L ---")
-        run_vbd_fl_validation()
-    else:
-        print("\n--- Part 2: Skipped (use without --skip-vbd to run) ---")
-
-    # Part 3: Activation dynamics
+    # Part 2: Activation dynamics
     run_activation_dynamics_validation()
 
     plt.show()

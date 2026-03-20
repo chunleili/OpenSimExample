@@ -6,7 +6,6 @@
     uv run python main.py test             # 仅运行Phase 1验证测试
     uv run python main.py curves           # 仅绘制DGF解析曲线
     uv run python main.py activation       # 仅运行激活动力学
-    uv run python main.py vbd              # 仅运行VBD准静态F-L
     uv run python main.py demo             # 运行VBD动态演示（重力下落）
 """
 
@@ -33,14 +32,6 @@ def run_activation():
     """激活动力学验证"""
     from run_level0_fem import run_activation_dynamics_validation
     run_activation_dynamics_validation()
-    import matplotlib.pyplot as plt
-    plt.show()
-
-
-def run_vbd():
-    """VBD准静态F-L验证"""
-    from run_level0_fem import run_vbd_fl_validation
-    run_vbd_fl_validation()
     import matplotlib.pyplot as plt
     plt.show()
 
@@ -158,7 +149,6 @@ def main():
         'test': ('Phase 1 验证测试', run_tests),
         'curves': ('DGF 解析曲线', run_curves),
         'activation': ('激活动力学', run_activation),
-        'vbd': ('VBD 准静态 F-L', run_vbd),
         'demo': ('VBD 动态演示', run_demo),
     }
     if len(sys.argv) > 1:
