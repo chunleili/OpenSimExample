@@ -512,6 +512,8 @@ def main():
     all_ok &= test_neo_hookean_gradient()
     all_ok &= test_total_gradient()
     all_ok &= test_hessian_consistency()
+    all_ok &= test_fiber_pk1_stress()
+    all_ok &= test_reaction_force_uniform()
     all_ok &= test_box_mesh()
     all_ok &= test_activation_dynamics()
     all_ok &= test_vbd_basic()
