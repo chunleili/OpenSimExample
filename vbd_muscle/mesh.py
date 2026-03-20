@@ -150,3 +150,52 @@ def assign_fiber_directions(nodes, tets, axis=None):
         axis = np.array([0.0, 0.0, 1.0])
     axis = axis / np.linalg.norm(axis)
     return np.tile(axis, (len(tets), 1))
+
+
+def extract_surface_triangles(tet_indices_np: np.ndarray) -> list[tuple[int, int, int]]:
+    """Extract surface triangles from a tetrahedral mesh.
+
+    A face shared by exactly one tet is a surface face.
+    """
+    face_count: dict[tuple, tuple] = {}
+    for tet in tet_indices_np:
+        v0, v1, v2, v3 = int(tet[0]), int(tet[1]), int(tet[2]), int(tet[3])
+        faces = [
+            (v0, v2, v1),
+            (v1, v2, v3),
+            (v0, v1, v3),
+            (v0, v3, v2),
+        ]
+        for f in faces:
+            key = tuple(sorted(f))
+            if key not in face_count:
+                face_count[key] = f
+            else:
+                face_count[key] = None  # shared face — mark for removal
+    surfs= [f for f in face_count.values() if f is not None]
+    surfs_np = np.array(surfs, dtype=int)
+    return surfs_np
+
+
+def save_ply(filename: str, positions: np.ndarray, surface_faces: np.ndarray):
+    """Save mesh surface to PLY file."""
+    # try:
+    #     import meshio
+    #     meshio.Mesh(points=positions, cells=[("triangle", surface_faces)]).write(filename)
+    #     return
+    # except ImportError:
+    #     pass
+    with open(filename, "w") as fp:
+        fp.write("ply\n")
+        fp.write("format ascii 1.0\n")
+        fp.write(f"element vertex {len(positions)}\n")
+        fp.write("property float x\n")
+        fp.write("property float y\n")
+        fp.write("property float z\n")
+        fp.write(f"element face {len(surface_faces)}\n")
+        fp.write("property list uchar int vertex_indices\n")
+        fp.write("end_header\n")
+        for p in positions:
+            fp.write(f"{p[0]:.6f} {p[1]:.6f} {p[2]:.6f}\n")
+        for f in surface_faces:
+            fp.write(f"3 {f[0]} {f[1]} {f[2]}\n")

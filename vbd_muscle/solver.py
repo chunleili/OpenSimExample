@@ -26,7 +26,7 @@ class VBDSolver:
                  mu=5000.0, kappa=500000.0, sigma0=300000.0,
                  density=1060.0, damping=0.01, dt=0.001,
                  n_iterations=20, gravity=None,
-                 scale=1.0, kPE=4.0, e0=0.6):
+                 scale=1.0, e0=0.6):
         """
         Args:
             nodes: Rest vertex positions, shape (n_vertices, 3).
@@ -41,7 +41,7 @@ class VBDSolver:
             n_iterations: VBD iterations per time step.
             gravity: Gravity vector, shape (3,). Default [0,0,-9.81].
             scale: Active force-length width scale.
-            kPE, e0: Passive force-length parameters.
+            e0: Passive fiber strain at one normalized force.
         """
         self.nodes_rest = np.array(nodes, dtype=float)
         self.x = self.nodes_rest.copy()
@@ -60,7 +60,6 @@ class VBDSolver:
                         if gravity is not None
                         else np.array([0.0, 0.0, -9.81]))
         self.scale = scale
-        self.kPE = kPE
         self.e0 = e0
 
         # Precompute rest-state data
@@ -171,8 +170,6 @@ class VBDSolver:
 
         # Initialize guess
         x_new = y.copy()
-        for vi, pos in self.prescribed_positions.items():
-            x_new[vi] = pos
         x_old = self.x.copy()
 
         # VBD Gauss-Seidel iterations
@@ -200,7 +197,7 @@ class VBDSolver:
                         P = total_pk1(
                             F, self.d0[elem_idx],
                             self.mu, self.kappa, self.sigma0,
-                            act[elem_idx], self.scale, self.kPE, self.e0)
+                            act[elem_idx], self.scale, self.e0)
 
                         b_vec = get_b_vec(self.Dm_inv[elem_idx], local_idx)
                         g_e = vertex_gradient_from_pk1(
@@ -212,7 +209,7 @@ class VBDSolver:
                             self.volumes[elem_idx], local_idx,
                             self.d0[elem_idx],
                             self.mu, self.kappa, self.sigma0,
-                            act[elem_idx], self.scale, self.kPE, self.e0)
+                            act[elem_idx], self.scale, self.e0)
                         hess_elastic += H_e
 
                     # Rayleigh damping
@@ -303,7 +300,7 @@ class VBDSolver:
                         P = total_pk1(
                             F, self.d0[elem_idx],
                             self.mu, self.kappa, self.sigma0,
-                            act[elem_idx], self.scale, self.kPE, self.e0)
+                            act[elem_idx], self.scale, self.e0)
 
                         b_vec = get_b_vec(self.Dm_inv[elem_idx], local_idx)
                         grad_i += vertex_gradient_from_pk1(
@@ -314,7 +311,7 @@ class VBDSolver:
                             self.volumes[elem_idx], local_idx,
                             self.d0[elem_idx],
                             self.mu, self.kappa, self.sigma0,
-                            act[elem_idx], self.scale, self.kPE, self.e0)
+                            act[elem_idx], self.scale, self.e0)
                         hess_i += H_e
 
                     if not np.all(np.isfinite(grad_i)):
@@ -384,7 +381,7 @@ class VBDSolver:
                 P = total_pk1(
                     F, self.d0[elem_idx],
                     self.mu, self.kappa, self.sigma0,
-                    act[elem_idx], self.scale, self.kPE, self.e0)
+                    act[elem_idx], self.scale, self.e0)
                 b_vec = get_b_vec(self.Dm_inv[elem_idx], local_idx)
                 grad += vertex_gradient_from_pk1(
                     P, self.volumes[elem_idx], b_vec)
@@ -419,7 +416,7 @@ class VBDSolver:
             F = compute_deformation_gradient(x_elem, self.Dm_inv[e])
             E += self.volumes[e] * total_energy(
                 F, self.d0[e], self.mu, self.kappa,
-                self.sigma0, act[e], self.scale, self.kPE, self.e0)
+                self.sigma0, act[e], self.scale, self.e0)
         return E
 
     def mesh_info(self):
